@@ -2,82 +2,86 @@ import librosa
 import os
 import json
 import numpy as np
+from scipy.special import softmax
+from essentia.standard import MonoLoader, TensorflowPredictEffnetDiscogs, TensorflowPredict2D
 
+# Function to extract audio features
 def extract_audio_features(audio_path):
-    """Extract audio features such as duration and bpm."""
     y, sr = librosa.load(audio_path, sr=None)
-    
-    # Duration in seconds (convert to float)
     duration = float(librosa.get_duration(y=y, sr=sr))
-    
-    # Extract tempo (bpm)
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-    
-    # Set default values for bpm if not available (convert to float)
-    if isinstance(tempo, np.ndarray):
-        tempo = float(tempo[0]) if len(tempo) > 0 else "unknown"
-    elif isinstance(tempo, (float, int)):
-        tempo = float(tempo)
-    else:
-        tempo = "unknown"
-    
     return duration, tempo, sr
 
-def generate_dataset_entry(audio_file, audio_path):
-    """Generate a dataset entry based on audio file metadata."""
-    # Extract audio features
+# Function to generate dataset entry
+def generate_dataset_entry(audio_file, audio_path, moods, keywords):
     duration, tempo, sample_rate = extract_audio_features(audio_path)
-    
-    # Define the genre (this can be customized or made dynamic)
-    genre = "cai luong, "  # Set a default genre or customize as needed
-    
-    # Generate textual description
-    description = f"A {duration:.1f} seconds long {tempo} BPM {genre} song with uplifting and motivational moods."
-    
-    # Define the entry metadata
+    mood_list = ', '.join(moods)
+    description = f"A {duration:.1f} seconds long song at {tempo} BPM with moods like {mood_list}."
     entry = {
         "key": "",
-        "artist": "",  # Customize or automate this field if needed
+        "artist": "",
         "sample_rate": sample_rate,
-        "file_extension": "mp3",
+        "file_extension": audio_file.split('.')[-1],
         "description": description,
-        "keywords": "bright, pulsing, cool",  # Customize or automate this field if needed
+        "keywords": ', '.join(keywords),
         "duration": duration,
         "bpm": tempo,
-        "genre": genre,  # Now genre is defined
-        "title": audio_file.split('.')[0],  # Use the filename as the title by default
-        "name": audio_file.split('.')[0],   # Use the filename as the name by default
-        "instrument": "Mix",  # Customize or automate this field
-        "moods": ["uplifting", "motivational"]  # Customize or automate this field
+        "genre": "Unknown",
+        "title": audio_file.split('.')[0],
+        "name": audio_file.split('.')[0],
+        "instrument": "Mix",
+        "moods": moods
     }
-    
     return entry
 
-def process_dataset(audio_dir):
-    """Process all audio files in the directory and generate JSON entries."""
-    dataset = []
+# Function to save dataset to JSON
+def save_to_json(entry, output_filename):
+    with open(output_filename, 'w') as f:
+        json.dump(entry, f, indent=4)
 
-    # Process each audio file
+# Function to extract embeddings using a trained model
+def extract_embeddings(audio_path):
+    audio = MonoLoader(filename=audio_path, sampleRate=16000, resampleQuality=4)()
+    embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
+    embeddings = embedding_model(audio)
+    return embeddings
+
+# Function to predict moods using embeddings
+def predict_moods(embeddings):
+    model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
+    predictions = model(embeddings)
+    probabilities = softmax(predictions, axis=1)[0]
+    return probabilities
+
+# Function to get top 5 moods from predictions
+def get_top_moods(probabilities):
+    labels = [
+        "action", "adventure", "advertising", "background", "ballad", "calm", "children", "christmas", "commercial",
+        "cool", "corporate", "dark", "deep", "documentary", "drama", "dramatic", "dream", "emotional", "energetic",
+        "epic", "fast", "film", "fun", "funny", "game", "groovy", "happy", "heavy", "holiday", "hopeful", "inspiring",
+        "love", "meditative", "melancholic", "melodic", "motivational", "movie", "nature", "party", "positive",
+        "powerful", "relaxing", "retro", "romantic", "sad", "sexy", "slow", "soft", "soundscape", "space", "sport",
+        "summer", "trailer", "travel", "upbeat", "uplifting"
+    ]
+    label_probabilities = list(zip(labels, probabilities))
+    top_five = sorted(label_probabilities, key=lambda x: x[1], reverse=True)[:5]
+    top_moods = [mood for mood, _ in top_five]
+    top_keywords = [mood for mood, _ in top_five]  # Assume keywords are same as moods for simplicity
+    return top_moods, top_keywords
+
+# Function to process dataset
+def process_dataset(audio_dir):
     for audio_file in os.listdir(audio_dir):
         if audio_file.endswith(".wav") or audio_file.endswith(".mp3"):
             audio_path = os.path.join(audio_dir, audio_file)
-            entry = generate_dataset_entry(audio_file, audio_path)
-            dataset.append(entry)
-    
-    return dataset
-
-def save_to_json(dataset, output_file):
-    """Save the dataset to a JSON file."""
-    with open(output_file, 'w') as f:
-        json.dump(dataset, f, indent=4)
+            embeddings = extract_embeddings(audio_path)
+            predictions = predict_moods(embeddings)
+            moods, keywords = get_top_moods(predictions)
+            entry = generate_dataset_entry(audio_file, audio_path, moods, keywords)
+            json_filename = os.path.join(audio_dir, f"{os.path.splitext(audio_file)[0]}_metadata.json")
+            save_to_json(entry, json_filename)
+            print(f"Metadata for {audio_file} saved to {json_filename}")
 
 if __name__ == "__main__":
-    audio_directory = "/home/user"  # Replace with your audio dataset path
-    output_json = "musicgen_dataset.json"
-
-    # Generate the dataset
-    dataset = process_dataset(audio_directory)
-
-    # Save the dataset to JSON
-    save_to_json(dataset, output_json)
-    print(f"Dataset saved to {output_json}")
+    audio_directory = "/path/to/your/audio/files"  # Update this path to your directory
+    process_dataset(audio_directory)
