@@ -1,3 +1,4 @@
+tensorflow[and-cuda]
 librosa
 numpy
 scipy
