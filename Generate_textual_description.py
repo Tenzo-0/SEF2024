@@ -26,7 +26,7 @@ def generate_dataset_entry(audio_file, audio_path, moods, keywords):
         "keywords": ', '.join(keywords),
         "duration": duration,
         "bpm": tempo,
-        "genre": "Unknown",
+        "genre": "Cai Luong",
         "title": audio_file.split('.')[0],
         "name": audio_file.split('.')[0],
         "instrument": "Mix",
