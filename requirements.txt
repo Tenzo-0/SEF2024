@@ -3,4 +3,4 @@ librosa
 numpy
 scipy
 pydub
-essentia
+essentia-tensorflow
