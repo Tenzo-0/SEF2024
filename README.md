@@ -1,4 +1,4 @@
-# Project Name
+# Project Vietnamese traditional music
 
 A brief description of your project, what it does, and why it’s useful.
 
@@ -20,4 +20,5 @@ List any software or tools that are required to run your project.
 
 ```bash
 # Example of installing dependencies (if any)
+sudo apt-get install ffmpeg
 pip install -r requirements.txt
