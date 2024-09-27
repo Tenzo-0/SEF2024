@@ -16,6 +16,7 @@ def extract_audio_features(audio_path):
 def generate_dataset_entry(audio_file, audio_path, moods, keywords):
     duration, tempo, sample_rate = extract_audio_features(audio_path)
     mood_list = ', '.join(moods)
+    keywords += ["Cai Luong", "Don ca tai tu", "Vietnamese Northside traditional music"]  # Added keywords
     description = f"A {duration:.1f} seconds long song at {tempo} BPM with moods like {mood_list}."
     entry = {
         "key": "",
@@ -36,10 +37,6 @@ def generate_dataset_entry(audio_file, audio_path, moods, keywords):
 
 # Function to save dataset to JSON
 def save_to_json(entry, output_filename):
-    # Ensure all ndarray entries are converted to lists
-    for key, value in entry.items():
-        if isinstance(value, np.ndarray):
-            entry[key] = value.tolist()
     with open(output_filename, 'w') as f:
         json.dump(entry, f, indent=4)
 
@@ -47,34 +44,23 @@ def save_to_json(entry, output_filename):
 def extract_embeddings(audio_path):
     try:
         audio = MonoLoader(filename=audio_path, sampleRate=16000, resampleQuality=4)()
-        if audio.size == 0:  # Check if audio is empty
+        if audio.size == 0:
             print(f"Warning: Audio file {audio_path} is empty. Deleting the file.")
-            os.remove(audio_path)  # Delete the empty audio file
-            return []  # Return an empty list if no audio is loaded
-
+            os.remove(audio_path)
+            return []
+        
         embedding_model = TensorflowPredictEffnetDiscogs(graphFilename="discogs-effnet-bs64-1.pb", output="PartitionedCall:1")
         embeddings = embedding_model(audio)
-
-        # Check if embeddings is a list and handle it accordingly
-        if isinstance(embeddings, list):
-            if len(embeddings) == 0 or (isinstance(embeddings[0], np.ndarray) and embeddings[0].size == 0):
-                print(f"Warning: No embeddings extracted from {audio_path}.")
-                return []  # Return an empty list if no embeddings
-
-        # Convert to numpy array if embeddings are valid
-        embeddings = np.array(embeddings)
-
-        return embeddings
-
+        return np.array(embeddings) if isinstance(embeddings, list) else embeddings
     except RuntimeError as e:
         print(f"Error processing {audio_path}: {e}")
-        return []  # Return an empty list on error
+        return []
 
 # Function to predict moods using embeddings
 def predict_moods(embeddings):
-    if len(embeddings) == 0 or (isinstance(embeddings, np.ndarray) and embeddings.size == 0):  # Check if embeddings are empty
+    if len(embeddings) == 0 or (isinstance(embeddings, np.ndarray) and embeddings.size == 0):
         print("Warning: No embeddings provided for mood prediction.")
-        return []  # Or handle appropriately
+        return []
     model = TensorflowPredict2D(graphFilename="mtg_jamendo_moodtheme-discogs-effnet-1.pb")
     predictions = model(embeddings)
     probabilities = softmax(predictions, axis=1)[0]
@@ -93,7 +79,7 @@ def get_top_moods(probabilities):
     label_probabilities = list(zip(labels, probabilities))
     top_five = sorted(label_probabilities, key=lambda x: x[1], reverse=True)[:5]
     top_moods = [mood for mood, _ in top_five]
-    top_keywords = [mood for mood, _ in top_five]  # Assume keywords are same as moods for simplicity
+    top_keywords = [mood for mood, _ in top_five]
     return top_moods, top_keywords
 
 # Function to process dataset
@@ -104,7 +90,7 @@ def process_dataset(audio_dir):
             embeddings = extract_embeddings(audio_path)
             if len(embeddings) == 0:
                 print(f"Skipping {audio_file} due to extraction issues.")
-                continue  # Skip the rest of the processing for this audio file
+                continue
             
             predictions = predict_moods(embeddings)
             moods, keywords = get_top_moods(predictions)
