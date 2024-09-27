@@ -1,55 +1,41 @@
 import os
 from pydub import AudioSegment
 
-def generate_custom_filename(index):
-    """
-    Generate filenames like '00', '01', '0A', '0Z', '10', '1A', etc.
-    Uses base-36 encoding to generate filenames.
-    """
-    char_map = [str(i) for i in range(10)] + [chr(i) for i in range(ord('A'), ord('Z') + 1)]
-    first_char = char_map[index // len(char_map)]  # Calculate first character
-    second_char = char_map[index % len(char_map)]  # Calculate second character
-    return first_char + second_char
+def split_audio_files(input_folder, output_folder):
+    # Ensure the output folder exists
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    
+    # Get all audio files in the input folder
+    audio_files = [f for f in os.listdir(input_folder) if f.endswith('.mp3') or f.endswith('.wav')]
+    
+    # Characters for renaming files
+    rename_chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    char_index = 0
 
-def split_audio_files(input_folder_path, output_folder_path, segment_length_ms=60000):  # Default to 60000ms which is 1 minute
-    # Ensure the input folder exists
-    if not os.path.exists(input_folder_path):
-        print("Input folder does not exist.")
-        return
+    def get_next_name(index):
+        name = ''
+        while index >= 0:
+            name = rename_chars[index % len(rename_chars)] + name
+            index = index // len(rename_chars) - 1
+        return name
 
-    # Ensure the output folder exists, if not create it
-    if not os.path.exists(output_folder_path):
-        os.makedirs(output_folder_path)
-        print(f"Created output folder at {output_folder_path}")
+    for audio_file in audio_files:
+        audio_path = os.path.join(input_folder, audio_file)
+        audio = AudioSegment.from_file(audio_path)
+        
+        print(f"Processing file: {audio_file}")
+        
+        # Split audio into 1-minute segments
+        for i in range(0, len(audio), 60 * 1000):
+            segment = audio[i:i + 60 * 1000]
+            segment_name = get_next_name(char_index) + os.path.splitext(audio_file)[1]
+            segment_path = os.path.join(output_folder, segment_name)
+            segment.export(segment_path, format="mp3" if audio_file.endswith('.mp3') else "wav")
+            
+            print(f"Exported segment: {segment_name}")
+            
+            char_index += 1
 
-    # Process each file in the input directory
-    for filename in os.listdir(input_folder_path):
-        if filename.endswith(".mp3") or filename.endswith(".wav"):  # Check for audio files
-            file_path = os.path.join(input_folder_path, filename)
-            audio = AudioSegment.from_file(file_path)
-
-            # Calculate the number of segments
-            duration = len(audio)
-            num_segments = (duration // segment_length_ms) + (1 if duration % segment_length_ms else 0)
-
-            # Split and export each segment
-            for i in range(num_segments):
-                start_time = i * segment_length_ms
-                end_time = min((i + 1) * segment_length_ms, duration)
-                segment = audio[start_time:end_time]
-
-                # Generate the custom filename like '00', '01', '0A', '0Z'
-                segment_filename = generate_custom_filename(i) + ".mp3"
-                segment_path = os.path.join(output_folder_path, segment_filename)
-
-                # Export the segment as MP3
-                segment.export(segment_path, format="mp3")
-                print(f"Exported {segment_path}")
-
-            # Optionally delete the original file to save space, uncomment the next line if needed
-            # os.remove(file_path)
-
-if __name__ == "__main__":
-    input_directory = "/home/user/SEF-2024-2025/dataset"  # Change this to your input directory
-    output_directory = "/home/user/output"  # Change this to your output directory
-    split_audio_files(input_directory, output_directory)
+# Example usage
+split_audio_files('/path/to/your/input_folder', '/path/to/your/output_folder')
