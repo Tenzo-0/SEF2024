@@ -27,8 +27,8 @@ def split_audio_files(input_folder, output_folder):
         print(f"Processing file: {audio_file}")
         
         # Split audio into 1-minute segments
-        for i in range(0, len(audio), 60 * 1000):
-            segment = audio[i:i + 60 * 1000]
+        for i in range(0, len(audio), 30 * 1000):
+            segment = audio[i:i + 30 * 1000]
             segment_name = get_next_name(char_index) + os.path.splitext(audio_file)[1]
             segment_path = os.path.join(output_folder, segment_name)
             segment.export(segment_path, format="mp3" if audio_file.endswith('.mp3') else "wav")
