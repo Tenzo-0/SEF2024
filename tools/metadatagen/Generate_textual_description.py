@@ -31,14 +31,30 @@ def generate_dataset_entry(audio_file, audio_path, moods, keywords):
         "title": audio_file.split('.')[0],
         "name": audio_file.split('.')[0],
         "instrument": "Mix",
-        "moods": moods
+        "moods": moods  # Ensure this is a list of strings
     }
     return entry
 
+# Helper function to make data JSON serializable
+def make_serializable(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.int32, np.int64)):
+        return int(obj)
+    elif isinstance(obj, (np.float32, np.float64)):
+        return float(obj)
+    elif isinstance(obj, (list, tuple)):
+        return [make_serializable(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: make_serializable(value) for key, value in obj.items()}
+    else:
+        return obj
+
 # Function to save dataset to JSON
 def save_to_json(entry, output_filename):
+    serializable_entry = make_serializable(entry)
     with open(output_filename, 'w') as f:
-        json.dump(entry, f, indent=4)
+        json.dump(serializable_entry, f, indent=4)
 
 # Function to extract embeddings using a trained model
 def extract_embeddings(audio_path):
@@ -78,8 +94,8 @@ def get_top_moods(probabilities):
     ]
     label_probabilities = list(zip(labels, probabilities))
     top_five = sorted(label_probabilities, key=lambda x: x[1], reverse=True)[:5]
-    top_moods = [mood for mood, _ in top_five]
-    top_keywords = [mood for mood, _ in top_five]
+    top_moods = [str(mood) for mood, _ in top_five]  # Ensure moods are strings
+    top_keywords = [str(mood) for mood, _ in top_five]  # Ensure keywords are strings
     return top_moods, top_keywords
 
 # Function to process dataset
