@@ -12,11 +12,18 @@ def extract_audio_features(audio_path):
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     return duration, tempo, sr
 
-# Function to generate dataset entry
+# Function to generate dataset entry with adjusted moods and keywords
 def generate_dataset_entry(audio_file, audio_path, moods, keywords):
     duration, tempo, sample_rate = extract_audio_features(audio_path)
-    mood_list = ', '.join(moods)
-    keywords += ["Cai Luong", "Don ca tai tu", "Vietnamese Northside traditional music"]  # Added keywords
+    exclude_terms = {"Cai Luong", "Don ca tai tu", "Vietnamese Northside traditional music"}
+
+    # Filter specific terms from moods
+    filtered_moods = [mood for mood in moods if mood not in exclude_terms]
+    mood_list = ', '.join(filtered_moods)
+
+    # These terms are added to keywords
+    enhanced_keywords = keywords + list(exclude_terms)
+
     description = f"A {duration:.1f} seconds long song at {tempo} BPM with moods like {mood_list}."
     entry = {
         "key": "",
@@ -24,14 +31,14 @@ def generate_dataset_entry(audio_file, audio_path, moods, keywords):
         "sample_rate": sample_rate,
         "file_extension": audio_file.split('.')[-1],
         "description": description,
-        "keywords": ', '.join(keywords),
+        "keywords": ', '.join(enhanced_keywords),
         "duration": duration,
         "bpm": tempo,
         "genre": "Cai Luong",
         "title": audio_file.split('.')[0],
         "name": audio_file.split('.')[0],
         "instrument": "Mix",
-        "moods": moods  # Ensure this is a list of strings
+        "moods": filtered_moods
     }
     return entry
 
@@ -82,7 +89,7 @@ def predict_moods(embeddings):
     probabilities = softmax(predictions, axis=1)[0]
     return probabilities
 
-# Function to get top 5 moods from predictions
+# Updated function to get top 3 moods with filtering unwanted moods
 def get_top_moods(probabilities):
     labels = [
         "action", "adventure", "advertising", "background", "ballad", "calm", "children", "christmas", "commercial",
@@ -92,11 +99,10 @@ def get_top_moods(probabilities):
         "powerful", "relaxing", "retro", "romantic", "sad", "sexy", "slow", "soft", "soundscape", "space", "sport",
         "summer", "trailer", "travel", "upbeat", "uplifting"
     ]
+    exclude_moods = {"christmas", "ballad", "game", "retro", "space"}
     label_probabilities = list(zip(labels, probabilities))
-    top_five = sorted(label_probabilities, key=lambda x: x[1], reverse=True)[:5]
-    top_moods = [str(mood) for mood, _ in top_five]  # Ensure moods are strings
-    top_keywords = [str(mood) for mood, _ in top_five]  # Ensure keywords are strings
-    return top_moods, top_keywords
+    filtered_moods = [label for label, prob in sorted(label_probabilities, key=lambda x: x[1], reverse=True) if label not in exclude_moods][:3]
+    return filtered_moods, filtered_moods
 
 # Function to process dataset
 def process_dataset(audio_dir):
@@ -107,7 +113,7 @@ def process_dataset(audio_dir):
             if len(embeddings) == 0:
                 print(f"Skipping {audio_file} due to extraction issues.")
                 continue
-            
+
             predictions = predict_moods(embeddings)
             moods, keywords = get_top_moods(predictions)
             entry = generate_dataset_entry(audio_file, audio_path, moods, keywords)
