@@ -2,43 +2,60 @@ from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from pydub.effects import normalize
 import os
+from multiprocessing import Pool
+
+def process_audio_file(args):
+    """Process a single audio file."""
+    file_path, output_directory = args
+    audio = AudioSegment.from_file(file_path)
+
+    # Process the audio to reduce silences
+    processed_audio = shorten_silences(audio)
+
+    # Enhance audio quality
+    enhanced_audio = enhance_audio_quality(processed_audio)
+
+    # Define the output path, keeping the same filename in the output directory
+    output_path = os.path.join(output_directory, "processed_" + os.path.basename(file_path))
+
+    # Save the enhanced audio
+    enhanced_audio.export(output_path, format="mp3")
+    return f"Enhanced audio saved successfully to {output_path}"
 
 def shorten_silences(audio_segment, silence_thresh=-40, min_silence_len=1000, desired_silence_len=3000):
-    chunks = split_on_silence(audio_segment,
-                              min_silence_len=min_silence_len,
-                              silence_thresh=silence_thresh,
-                              keep_silence=desired_silence_len)
+    chunks = split_on_silence(audio_segment, min_silence_len=min_silence_len, silence_thresh=silence_thresh, keep_silence=desired_silence_len)
+    if not chunks:
+        print("No silent segments detected, returning original audio segment.")
+        return audio_segment
     processed_segment = chunks[0]
     for chunk in chunks[1:]:
         processed_segment += AudioSegment.silent(duration=desired_silence_len) + chunk
     return processed_segment
 
 def enhance_audio_quality(audio_segment):
-    normalized_audio = normalize(audio_segment)
-    return normalized_audio
+    return normalize(audio_segment)
 
-def process_audio_files(directory):
+def process_audio_files(input_directory, output_directory):
     """
-    Process all MP3 files in the given directory to reduce silences and enhance audio quality.
+    Process all MP3 files in the given input directory to reduce silences, 
+    enhance audio quality, and save them in the output directory.
     """
-    for filename in os.listdir(directory):
-        if filename.endswith(".mp3"):
-            file_path = os.path.join(directory, filename)
-            audio = AudioSegment.from_file(file_path)
+    # Ensure the output directory exists
+    os.makedirs(output_directory, exist_ok=True)
+    
+    # Create a list of tuples (file_path, output_directory) for multiprocessing
+    files = [(os.path.join(input_directory, f), output_directory) 
+             for f in os.listdir(input_directory) if f.endswith('.mp3')]
+    
+    # Use a multiprocessing pool to process files concurrently
+    with Pool() as pool:
+        results = pool.map(process_audio_file, files)
+    
+    # Print out the results for each processed file
+    for result in results:
+        print(result)
 
-            # Process the audio to reduce silences to 3 seconds
-            processed_audio = shorten_silences(audio)
-
-            # Enhance audio quality
-            enhanced_audio = enhance_audio_quality(processed_audio)
-
-            # Define the output path
-            output_path = os.path.join(directory, "p_" + filename)
-            
-            # Save the enhanced audio
-            enhanced_audio.export(output_path, format="mp3")
-            print(f"Enhanced audio saved successfully to {output_path}")
-
-# Specify the directory containing your audio files
-audio_directory = "/home/user/home/user/output"
-process_audio_files(audio_directory)
+# Specify the input and output directories
+input_directory = "path_to_your_input_audio_files"
+output_directory = "path_to_your_output_audio_files"
+process_audio_files(input_directory, output_directory)
