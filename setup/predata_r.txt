@@ -3,4 +3,5 @@ librosa
 numpy
 scipy
 pydub
+spleeter
 essentia-tensorflow
