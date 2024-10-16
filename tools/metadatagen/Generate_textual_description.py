@@ -99,7 +99,7 @@ def get_top_moods(probabilities):
         "powerful", "relaxing", "retro", "romantic", "sad", "sexy", "slow", "soft", "soundscape", "space", "sport",
         "summer", "trailer", "travel", "upbeat", "uplifting"
     ]
-    exclude_moods = {"christmas", "ballad", "game", "retro", "space"}
+    exclude_moods = {"christmas", "ballad", "game", "retro", "space", "sport", "trailer", "travel", "action", "adventure", "advertising", "children", "commercial", "corporate", "holiday", "party", "soundcape"}
     label_probabilities = list(zip(labels, probabilities))
     filtered_moods = [label for label, prob in sorted(label_probabilities, key=lambda x: x[1], reverse=True) if label not in exclude_moods][:3]
     return filtered_moods, filtered_moods
