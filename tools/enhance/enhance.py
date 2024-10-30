@@ -2,7 +2,7 @@ from pydub import AudioSegment
 from pydub.silence import split_on_silence
 from pydub.effects import normalize
 import os
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 
 def process_audio_file(args):
     """Process a single audio file."""
@@ -18,8 +18,8 @@ def process_audio_file(args):
     # Define the output path, keeping the same filename in the output directory
     output_path = os.path.join(output_directory, "processed_" + os.path.basename(file_path))
 
-    # Save the enhanced audio
-    enhanced_audio.export(output_path, format="mp3")
+    # Save the enhanced audio with lower bitrate for faster encoding
+    enhanced_audio.export(output_path, format="mp3", bitrate="128k")
     return f"Enhanced audio saved successfully to {output_path}"
 
 def shorten_silences(audio_segment, silence_thresh=-40, min_silence_len=1000, desired_silence_len=3000):
@@ -47,8 +47,8 @@ def process_audio_files(input_directory, output_directory):
     files = [(os.path.join(input_directory, f), output_directory) 
              for f in os.listdir(input_directory) if f.endswith('.mp3')]
     
-    # Use a multiprocessing pool to process files concurrently
-    with Pool() as pool:
+    # Use a multiprocessing pool with the CPU count for efficiency
+    with Pool(processes=cpu_count()) as pool:
         results = pool.map(process_audio_file, files)
     
     # Print out the results for each processed file
@@ -56,6 +56,6 @@ def process_audio_files(input_directory, output_directory):
         print(result)
 
 # Specify the input and output directories
-input_directory = "path_to_your_input_audio_files"
-output_directory = "path_to_your_output_audio_files"
+input_directory = "/home/user/aaa"
+output_directory = "/home/user/output"
 process_audio_files(input_directory, output_directory)
