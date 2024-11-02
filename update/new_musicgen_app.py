@@ -40,6 +40,16 @@ MBD = None
 # We have to wrap subprocess call to clean a bit the log when using gr.make_waveform
 _old_call = sp.call
 
+theme = gr.themes.Base(
+    primary_hue="lime",
+    secondary_hue="lime",
+    neutral_hue="neutral",
+).set(
+    button_primary_background_fill_hover='*primary_500',
+    button_primary_background_fill_hover_dark='*primary_500',
+    button_secondary_background_fill_hover='*primary_500',
+    button_secondary_background_fill_hover_dark='*primary_500'
+)
 
 def _call_nostderr(*args, **kwargs):
     # Avoid ffmpeg vomiting on the logs.
@@ -271,7 +281,7 @@ def translate_text(text, source_language='vi', target_language='en'):
 
 
 def ui_full(launch_kwargs):
-    with gr.Blocks() as demo:
+    with gr.Blocks(title='MusicGen for Vietnamese ancient music heritage', theme=theme) as interface:
         gr.Markdown(
             """
             #MusicGen for Vietnamese ancient music heritage
