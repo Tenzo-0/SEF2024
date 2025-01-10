@@ -19,6 +19,8 @@ def download_video(url, count_lock, count_value):
         }],
         'outtmpl': 'downloads/%(title)s.%(ext)s',  # Save files in the 'downloads' folder
         'quiet': False,  # Set to True to suppress log output
+        'clean': true,
+        'cookies': '/home/user/your_cookies_file.txt'
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
