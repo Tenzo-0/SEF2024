@@ -5,11 +5,6 @@ import threading
 
 # Function to download a single video as MP3 with the best quality
 def download_video(url, count_lock, count_value):
-    # Get the current thread ID (for debugging purposes)
-    thread_id = threading.get_ident()
-    
-    print(f"Thread {thread_id} started downloading: {url}")
-    
     ydl_opts = {
         'format': 'bestaudio/best',  # Ensure we download the best audio format available
         'postprocessors': [{
@@ -25,8 +20,6 @@ def download_video(url, count_lock, count_value):
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-
-    print(f"Thread {thread_id} finished downloading: {url}")
 
     # Update the count of downloaded files in real-time
     with count_lock:
