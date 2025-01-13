@@ -5,3 +5,4 @@ scipy
 pydub
 spleeter
 essentia-tensorflow
+demucs
