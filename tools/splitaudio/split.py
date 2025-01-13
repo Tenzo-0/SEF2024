@@ -1,50 +1,48 @@
-import os
-from multiprocessing import Pool
 from pydub import AudioSegment
+from pydub.silence import split_on_silence
+from pydub.effects import normalize
+import os
+from multiprocessing import Pool, cpu_count
 
-def split_audio_file(audio_file_info):
-    input_folder, output_folder, audio_file, char_index_start = audio_file_info
-    
-    # Define characters for renaming files
+def enhance(audio):
+    return normalize(audio)
+
+def process_audio(info):
+    input, output, audio, i = info
+    audio_path = os.path.join(input, audio)
+    audio_f = AudioSegment.from_file(audio_path)
+
+    print(f"Processing file: {audio}")
+
+    enhanced_audio = enhance(audio_f)
+    splited_audios = split_on_silence(enhanced_audio, min_silence_len=3000, silence_thresh=-30)
+
     rename_chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-
-    def get_next_name(index):
-        name = ''
+    def get_name(index):
+        next_name = ''
         while index >= 0:
-            name = rename_chars[index % len(rename_chars)] + name
+            next_name = rename_chars[index % len(rename_chars)] + next_name
             index = index // len(rename_chars) - 1
-        return name
+        return next_name
 
-    audio_path = os.path.join(input_folder, audio_file)
-    audio = AudioSegment.from_file(audio_path)
-    
-    print(f"Processing file: {audio_file}")
-    
-    # Split audio into 30-second segments
-    for i in range(0, len(audio), 30 * 1000):
-        segment = audio[i:i + 30 * 1000]
-        segment_name = get_next_name(char_index_start) + os.path.splitext(audio_file)[1]
-        segment_path = os.path.join(output_folder, segment_name)
-        segment.export(segment_path, format="mp3" if audio_file.endswith('.mp3') else "wav")
-        
-        print(f"Exported segment: {segment_name}")
-        
-        char_index_start += 1
+    for splited_audio in splited_audios:
+        name = get_name(i) + os.path.splitext(audio)[1] 
+        path = os.path.join(output, name)
+        splited_audio.export(path, format="mp3", bitrate="128k")
+        print(f"Exported segment: {name}")
+        i += 1
 
-def split_audio_files(input_folder, output_folder, num_processes=4):
-    # Ensure the output folder exists
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+def process_audios(input, output):
+    os.makedirs(output, exist_ok=True)
+    audio_files = [f for f in os.listdir(input) if f.endswith('.mp3') or f.endswith('.wav')]
     
-    # Get all audio files in the input folder
-    audio_files = [f for f in os.listdir(input_folder) if f.endswith('.mp3') or f.endswith('.wav')]
-
-    # Prepare data for multiprocessing
-    audio_file_infos = [(input_folder, output_folder, audio_file, idx * 100) for idx, audio_file in enumerate(audio_files)]
+    audio_file_infos = [(input, output, audio_file, idx * 100) for idx, audio_file in enumerate(audio_files)]
     
-    # Use a pool of workers to process files in parallel
-    with Pool(processes=num_processes) as pool:
-        pool.map(split_audio_file, audio_file_infos)
+    with Pool(processes=cpu_count()) as pool:
+        pool.map(process_audio, audio_file_infos)
+    
+    print("Finish")
 
-# Example usage
-split_audio_files('/home/user/output', '/home/user/dataset', num_processes=4)
+input= "/home/tenzo/Desktop/test"
+output= "/home/tenzo/Desktop/test"
+process_audios(input, output)
