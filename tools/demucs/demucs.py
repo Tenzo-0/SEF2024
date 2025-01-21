@@ -10,7 +10,6 @@ def process_file(file_path, gpu_id):
         args = [
             "--mp3",
             "--two-stems", "vocals",
-            "-n", "mdx_extra",
             "--segment", "7",
             "--overlap", "0.1",
             file_path
