@@ -1,5 +1,6 @@
 import librosa
 import os
+from openai import OpenAI
 import json
 import numpy as np
 from scipy.special import softmax
@@ -12,19 +13,41 @@ def extract_audio_features(audio_path):
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
     return duration, tempo, sr
 
+def GPT_description(trans) :
+    client = OpenAI(
+        api_key="your_api_key"
+    )
+
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Bạn là một nhạc sĩ đờn ca tài tử nam bộ Việt Nam"},
+            {
+                "role": "user",
+            "content": f"tôi sẽ cho bạn lời nhạc, việc của bạn là nhận biết bối cảnh của đoạn nhạc và viết cho tôi một đoạn mô tả không cách dòng viết liền khoảng 100 từ bằng tiếng anh, sau khi viết xong mô tả, xuống dòng và viết cho tôi một vài keywords liên quan đến mô tả, lời nhạc:\n {trans}"
+            }
+        ]
+    )
+    res = completion.choices[0].message.content
+    message, keywords = res.strip().split("\n\n", 1)
+    keywords = keywords.replace("Keywords: ", "").strip()
+    return message, keywords
+
 # Function to generate dataset entry with adjusted moods and keywords
-def generate_dataset_entry(audio_file, audio_path, moods, keywords):
+def generate_dataset_entry(audio_file, audio_path, moods, keywords, trans):
     duration, tempo, sample_rate = extract_audio_features(audio_path)
-    exclude_terms = {"Cai Luong", "Don ca tai tu", "Vietnamese Northside traditional music"}
+    exclude_terms = {"Don ca tai tu", "Vietnamese Northside traditional music"}
 
     # Filter specific terms from moods
     filtered_moods = [mood for mood in moods if mood not in exclude_terms]
     mood_list = ', '.join(filtered_moods)
 
-    # These terms are added to keywords
-    enhanced_keywords = keywords + list(exclude_terms)
+    description_chatgpt, keywords_chatgpt = GPT_description(trans)
+    enhanced_keywords = keywords + [keywords_chatgpt] + list(exclude_terms)
 
-    description = f"A {duration:.1f} seconds long song at {tempo} BPM with moods like {mood_list}."
+    description = f"A {duration:.1f} seconds long song at {tempo} BPM with moods like {mood_list}. {description_chatgpt}"
+
+
     entry = {
         "key": "",
         "artist": "",
@@ -99,13 +122,16 @@ def get_top_moods(probabilities):
         "powerful", "relaxing", "retro", "romantic", "sad", "sexy", "slow", "soft", "soundscape", "space", "sport",
         "summer", "trailer", "travel", "upbeat", "uplifting"
     ]
-    exclude_moods = {"christmas", "ballad", "game", "retro", "space", "sport", "trailer", "travel", "action", "adventure", "advertising", "children", "commercial", "corporate", "holiday", "party", "soundcape"}
+    exclude_moods = {"christmas", "ballad", "game", "retro", "space", "sport", "trailer", "travel", "action", "adventure", "advertising", "children", "commercial", "corporate", "holiday", "party", "soundcape", "sexy", "summer", "background", "drama", "documentary", "movie", "motivational", "nature", "party", "powerful"}
     label_probabilities = list(zip(labels, probabilities))
     filtered_moods = [label for label, prob in sorted(label_probabilities, key=lambda x: x[1], reverse=True) if label not in exclude_moods][:3]
     return filtered_moods, filtered_moods
 
 # Function to process dataset
-def process_dataset(audio_dir):
+def process_dataset(audio_dir, trans_dir):
+    with open(trans_dir, 'r') as file:
+        data = json.load(file)
+
     for audio_file in os.listdir(audio_dir):
         if audio_file.endswith(".wav") or audio_file.endswith(".mp3"):
             audio_path = os.path.join(audio_dir, audio_file)
@@ -116,11 +142,12 @@ def process_dataset(audio_dir):
 
             predictions = predict_moods(embeddings)
             moods, keywords = get_top_moods(predictions)
-            entry = generate_dataset_entry(audio_file, audio_path, moods, keywords)
+            entry = generate_dataset_entry(audio_file, audio_path, moods, keywords, data[audio_file])
             json_filename = os.path.join(audio_dir, f"{os.path.splitext(audio_file)[0]}_metadata.json")
             save_to_json(entry, json_filename)
             print(f"Metadata for {audio_file} saved to {json_filename}")
 
 if __name__ == "__main__":
-    audio_directory = "/home/user/output"  # Update this path to your directory
-    process_dataset(audio_directory)
+    audio_directory = "/home/user/d2"  # Update this path to your directory
+    transcription_dir = "/home/user/d2_json.json"
+    process_dataset(audio_directory,transcription_dir)
